@@ -19,6 +19,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   require('./ipcMain/http')
+  require('./ipcMain/parseHtml')
   createWindow()
 
   app.on('activate', function () { })

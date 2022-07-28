@@ -1,5 +1,4 @@
 import { ref, computed } from 'vue'
-import axios from '@/plugins/axios'
 import { __VIEWSTATE } from '@/provider/sys'
 
 export let onlyVip = ref(false)
@@ -52,7 +51,6 @@ export function loginAccount(id) {
     json: true,
     headers: {
       "content-type": "application/x-www-form-urlencoded",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36"
     },
   }).then(res => {
     if (res.cookie && res.cookie.length > 1) {
@@ -82,18 +80,21 @@ export function loginAccount(id) {
 async function loopGetOnlineManList(id) {
   let _t = 50
   accountMap.value[id].status = '查询中'
-  await getContactsList(id)
-  getOnlineManList(id, { onlines: _t }).then(res => {
-    accountMap.value[id].status = '查询成功'
-    accountMap.value[id].interval = setInterval(() => {
-      accountMap.value[id].status = '轮询中'
-      _t += 1024
-      getOnlineManList(id, { onlines: _t }).then(res => {
-        accountMap.value[id].status = `新增${res.length}`
-      })
-    }, 1000 * 35)
-  })
+  getInbox(id)
+  // await getContactsList(id)
+  // getOnlineManList(id, { onlines: _t }).then(res => {
+  //   accountMap.value[id].status = '查询成功'
+  //   accountMap.value[id].interval = setInterval(() => {
+  //     accountMap.value[id].status = '轮询中'
+  //     _t += 1024
+  //     getOnlineManList(id, { onlines: _t }).then(res => {
+  //       accountMap.value[id].status = `新增${res.length}`
+  //     })
+  //   }, 1000 * 35)
+  // })
 }
+
+
 export function getOnlineManList(id, params) {
   console.log(accountCookieMap.value[id])
   return new Promise((resolve, reject) => {
@@ -142,6 +143,29 @@ function getContactsList(id) {
         item.member.status = '等待中'
         return item.member
       }) || []
+    }
+  })
+}
+
+function getInbox(id){
+  window.$http({
+    url:'https://www.globalcompanions.com/Login/MailSystem/Inbox.aspx',
+    method:'GET',
+    jar:true,
+    form: {
+      __EVENTTARGET: 'ctl00$MAIN$cntrlInbox$cntrlPager',
+      __EVENTARGUMENT:'Prev',
+      __VIEWSTATE: __VIEWSTATE,
+    },
+    json: true,
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      Cookie: accountCookieMap.value[id]
+    },
+  }).then(res=>{
+    console.log(res)
+    if(res.body){
+      window.$html(res.body)
     }
   })
 }

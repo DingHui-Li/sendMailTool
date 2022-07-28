@@ -7,6 +7,8 @@
       el-table-column(label="编号", type="index", width="100")
       el-table-column(label="账号", property="id")
       el-table-column(label="总数")
+        template(#default="{row}")
+          div {{sendRecordMap[row?.id]?.length||0}}
       el-table-column(label="已发送")
       el-table-column(label="状态")
         template(#default="scope")
