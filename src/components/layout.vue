@@ -14,9 +14,11 @@ import { tabs } from "@/provider/sys.js";
 import SendByOnline from "@/pages/sendByOnline/index.vue";
 import SendByAppoint from "@/pages/sendByAppoint/index.vue";
 import Search from "@/pages/search/index.vue";
+import SendQueue from '@/pages/sendQueue.vue'
 
 const components = {
   SendByOnline,
+  SendQueue,
   SendByAppoint,
   Search,
 };

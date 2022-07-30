@@ -3,7 +3,10 @@ import { Account, accountMap, accountCookieMap } from './index'
 import { upload__VIEWSTATE, send__VIEWSTATE } from '@/provider/sys'
 
 export let isStartOfTask = ref(false)
-export let taskList = ref([])
+export let taskQueue = ref({
+    sending:[],
+    pending:[]
+})
 export let sendSetting = ref({
     onlyVip: false,
     checkRepeat: true,
@@ -17,9 +20,6 @@ export async function chooseConfigFile() {
     list.map(item => {
         accountMap.value[item.id] = new Account({ ...item })
     })
-}
-export function upload(account) {
-    send(account)
 }
 export function send(account) {
     console.log('send')

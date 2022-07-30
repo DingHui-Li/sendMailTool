@@ -7,6 +7,10 @@ export const tabs = ref({
       component: "SendByOnline",
     },
     {
+      label: '发送队列',
+      component: "SendQueue",
+    },
+    {
       label: '定向发送信件',
       component: "SendByAppoint",
     },

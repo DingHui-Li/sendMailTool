@@ -4,4 +4,9 @@
 </template>
 <script setup>
 </script>
-<style scoped lang="less"></style>
+<style scoped lang="less">
+.page{
+  height:100%;
+  padding:15px;
+}
+</style>

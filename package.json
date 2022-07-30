@@ -54,5 +54,6 @@
       "buildResources": "assets",
       "output": "dist_electron"
     }
-  }
+  },
+  "__npminstall_done": false
 }

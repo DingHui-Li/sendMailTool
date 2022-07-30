@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { __VIEWSTATE } from '@/provider/sys'
-import { isStartOfTask } from './send'
+import { isStartOfTask,taskQueue } from './send'
 
 export class Account {
   id = ''
@@ -103,7 +103,6 @@ async function loopGetOnlineManList(id) {
   let _t = 50
   await getInbox(id)
   await getContactsList(id)
-  sendRecordMap.value[id] = removeRepeat(sendRecordMap.value[id])
   if (accountMap.value[id].interval) {
     clearInterval(accountMap.value[id].interval)
   }
@@ -135,7 +134,7 @@ function getOnlineManList(id, params) {
       if (res.body) {
         try {
           let data = JSON.parse(res.body)
-          pushRecord({ id, list: data[0]?.updates?.map(item => item.member), type: 'online' })
+          pushQueue({ id, list: data[0]?.updates?.map(item => item.member), type: '在线' })
           resolve(data[0]?.updates)
         } catch (err) {
           reject()
@@ -159,7 +158,7 @@ function getContactsList(id) {
   }).then(res => {
     if (res.body) {
       let data = JSON.parse(res.body)
-      pushRecord({ id, list: data[0]?.updates?.map(item => item.member), type: 'contact' })
+      pushQueue({ id, list: data[0]?.updates?.map(item => item.member), type: '联系人' })
     }
   })
 }
@@ -183,7 +182,7 @@ function getInbox(id, params = {}) {
   }).then(async res => {
     if (res.body) {
       let _t = await window.$html({ html: res.body, page: 'inbox' })
-      pushRecord({ id, list: _t.list, type: 'inbox' })
+      pushQueue({ id, list: _t.list, type: '收件箱' })
       if (sendRecordMap.value[id]?.length < _t.total) {
         return getInbox(id, { __EVENTARGUMENT: 'Next', })
       }
@@ -191,18 +190,15 @@ function getInbox(id, params = {}) {
   })
 }
 
-//插入
-function pushRecord({ id, list, type }) {
-  if (!sendRecordMap.value[id]) {
-    sendRecordMap.value[id] = []
-  }
+//进入队列，等待发送
+function pushQueue({ id, list, type }) {
   list.map(item => {
     item.status = '等待中'
     item.type = type
-    sendRecordMap.value[id].push(item)
+    item.accountId=id
+    taskQueue.value.pending.push(item)
   })
-  console.log(type)
-  console.log(list)
+  taskQueue.value.pending = removeRepeat(taskQueue.value.pending)
 }
 
 //去重

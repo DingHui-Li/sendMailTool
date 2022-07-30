@@ -57,7 +57,6 @@ import { ref, onMounted, computed } from "vue";
 import Tools from "./__com__/tools.vue";
 import { accountMap, sendRecordMap, selectedList } from "./provider/index";
 import { Loading } from "@element-plus/icons-vue";
-import { upload } from "./provider/send";
 
 let accountList = computed(() => {
   return Object.values(accountMap.value);
@@ -91,6 +90,7 @@ function handleSelectionChange(e) {
 </script>
 <style scoped lang="less">
 .page {
+  height:calc(100vh - 30px);
   padding: 15px;
   &:deep(.el-tag) {
     border: none;
