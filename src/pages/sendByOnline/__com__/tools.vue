@@ -1,67 +1,126 @@
 <template lang='pug'>
 .tools
-  .left
+  .row
     .btns
-      el-button 选择配置文件夹
-      el-button 重新读取配置
-      el-button(@click="onlyVip = !onlyVip")
-        span(style="margin-right: 10px") 只发送VIP
-        el-switch(v-model="onlyVip", style="pointer-events: none")
-      el-button 清空列表
-      el-button 重置进度
-    .title 发送模式
+      el-button.btn(@click="chooseConfigFile", color="#607D8B") {{ ifAccountEmpty ? '选择配置文件夹' : '重新选择配置文件夹' }}
+      el-button.btn(
+        color="#FF5252",
+        style="color: #fff",
+        :disabled="ifAccountEmpty",
+        @click="clearList"
+      ) 清空列表
+      el-button.btn(
+        color="#FF5252",
+        style="color: #fff",
+        :disabled="ifAccountEmpty",
+        @click="resetProgress"
+      ) 重置进度
+    el-button(
+      v-if="!isStartOfTask",
+      :disabled="ifAccountEmpty",
+      type="success",
+      @click="start"
+    ) 全部开始
+    el-button(v-else, color="#FF9800", style="color: #fff") 全部暂停
+  .title 发送设置
+  .row.setting
     .btns
-      el-radio-group(v-model="mode", size="normal")
-        el-tooltip(
-          effect="dark",
-          content="每次发送会检测重复，发送速度较慢",
-          placement="top-start"
-        )
-          el-radio-button(:label="1") 模式1
-        el-tooltip(
-          effect="dark",
-          content="发送速度较快，但可能发送重复信件",
-          placement="top-start"
-        )
-          el-radio-button(:label="2") 模式2
-        el-tooltip(effect="dark", placement="top-start")
-          template(#content)
-            div(style="width: 250px; word-break: break-all") 启用多个线程同时发送，既有普通模式的重复检测功能，又具备极速模式的速度，但可能消耗更多的电脑资源
-          el-radio-button(:label="3") 模式3
-      el-input-number(
-        v-if="mode == 3",
-        v-model="threadNum",
-        style="width: 110px; margin-left: 10px",
-        :min="1",
-        :max="5"
+      el-button.btn(
+        @click="sendSetting.checkRepeat = !sendSetting.checkRepeat"
       )
-  .right
-    el-button 全部暂停
+        span(style="margin-right: 10px") 校验重复
+        el-switch(
+          v-model="sendSetting.checkRepeat",
+          style="pointer-events: none"
+        )
+      el-button.btn(@click="sendSetting.onlyVip = !sendSetting.onlyVip")
+        span(style="margin-right: 10px") 只发送VIP
+        el-switch(v-model="sendSetting.onlyVip", style="pointer-events: none")
+      .task-num
+        el-button
+          span 同时发送任务数
+          el-input-number(
+            v-model="sendSetting.concurrency",
+            style="width: 110px; margin-left: 10px",
+            :min="1",
+            :max="100"
+          )
+    .other-btns(v-if="selectedList.length")
+      el-button(type="danger", @click="removeSelected") 删除({{ selectedList.length }})
+      el-button(type="warning", @click="resetSelected") 重置登录({{ selectedList.length }})
 </template>
 <script setup>
-import { onlyVip, mode, threadNum } from "../provider/index";
+import { computed, ref } from "vue";
+import { chooseConfigFile, isStartOfTask, sendSetting } from "../provider/send";
+import {
+  start,
+  accountMap,
+  sendRecordMap,
+  resetSendRecord,
+  clear,
+  selectedList,
+  loginAccount,
+} from "../provider/index";
+
+import { ElMessageBox } from "element-plus";
+
+let ifAccountEmpty = computed(() => {
+  return !Boolean(Object.keys(accountMap.value).length);
+});
+
+function clearList() {
+  ElMessageBox.confirm("确定要清空当前列表吗？").then(() => {
+    clear();
+  });
+}
+function resetProgress() {
+  ElMessageBox.confirm("确定要重置发送进度吗？重置后无法恢复").then(() => {
+    resetSendRecord();
+  });
+}
+function removeSelected() {
+  selectedList.value.map((item) => {
+    delete accountMap.value[item.id];
+  });
+}
+function resetSelected() {
+  selectedList.value.map((item) => {
+    loginAccount(item.id);
+  });
+}
 </script>
 <style scoped lang="less">
 .tools {
-  text-align: left;
-  display: flex;
+  &:deep(.el-button) {
+    margin: 0;
+    margin-right: 10px;
+    margin-bottom: 10px;
+  }
+  .row {
+    display: flex;
+    align-items: flex-start;
+    .btns {
+      flex: 1;
+      overflow: hidden;
+      flex-wrap: wrap;
+      display: flex;
+      align-items: flex-start;
+    }
+    &.setting {
+      display: flex;
+      align-items: center;
+      .task-num {
+        margin-right: 10px;
+        &:deep(.el-button) {
+          padding-right: 0;
+        }
+      }
+    }
+  }
   .title {
     font-size: 14px;
     font-weight: bold;
     margin-bottom: 5px;
-  }
-  .left {
-    flex: 1;
-    .btns {
-      flex-wrap: wrap;
-      display: flex;
-      margin-bottom: 15px;
-    }
-  }
-  .right {
-    display: flex;
-    margin-right: 30rpx;
-    justify-content: right;
   }
 }
 </style>

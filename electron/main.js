@@ -1,5 +1,6 @@
 const { app, BrowserWindow } = require('electron')
 const path = require('path')
+const NODE_ENV = process.env.NODE_ENV
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -14,12 +15,14 @@ function createWindow() {
   })
 
   // mainWindow.loadFile('dist/index.html')
-  mainWindow.loadURL("http:localhost:2333")
+  mainWindow.loadURL(NODE_ENV === 'development' ? "http:localhost:2333" : `file://${path.join(__dirname, '../dist/index.html')}`)
 }
 
 app.whenReady().then(() => {
   require('./ipcMain/http')
   require('./ipcMain/parseHtml')
+  require('./ipcMain/file')
+  require('./ipcMain/send')
   createWindow()
 
   app.on('activate', function () { })
