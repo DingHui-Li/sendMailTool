@@ -1,37 +1,34 @@
 import { ref, computed } from 'vue'
 import { __VIEWSTATE } from '@/provider/sys'
+import { isStartOfTask } from './send'
 
-export let onlyVip = ref(false)
-export let mode = ref(1)
-export let threadNum = ref(5)
-
-class Account {
+export class Account {
   id = ''
   pw = ''
-  status = '就绪'//登录中，登录失败，查询中，发信中
+  name = ''
+  avatar = ''
+  template = ''
+  imgs = []
+  configPath = ''
+  status = '就绪'
   interval = 0//定时器id
   newCount = 0
-  constructor({ id, pw }) {
+  constructor({ id, pw, template, imgs, configPath }) {
     this.id = id
     this.pw = pw
+    this.template = template
+    this.imgs = imgs
+    this.configPath = configPath
   }
 }
-export let accountMap = ref({
-  "1169659":
-    new Account({
-      id: "1169659",
-      pw: "123456",
-    }),
-  "1480313":
-    new Account({
-      id: "1480313",
-      pw: "123456",
-    }),
-})
-export let accountCookieMap = ref({})
-export let sendRecordMap = ref({})
+export let accountMap = ref({})
+export let accountCookieMap = ref({})//id:[Account]
+export let sendRecordMap = ref({})//id:[...Account,status]
+export let selectedList = ref([])
 
 export function start() {
+  isStartOfTask.value = true
+
   Object.keys(accountMap.value).map((id) => {
     loginAccount(id)
   })
@@ -54,7 +51,7 @@ export function loginAccount(id) {
     },
   }).then(res => {
     if (res.cookie && res.cookie.length > 1) {
-      accountCookieMap.value[id] = res.cookie.join(';')
+      accountCookieMap.value[id] = res.cookie
       window.$http({
         url: 'https://www.globalcompanions.com/default.aspx',
         method: "POST",
@@ -62,41 +59,67 @@ export function loginAccount(id) {
         headers: {
           Cookie: res.cookie.join(';')
         }
-      }).then(res => {
-        if (res.cookie && res.cookie.length > 1) {
-          accountCookieMap.value[id] = accountCookieMap.value[id] + ";" + res.cookie.join(';')
+      }).then(res2 => {
+        if (res2.cookie && res2.cookie.length > 1) {
+          accountCookieMap.value[id] = [...accountCookieMap.value[id], ...res2.cookie]
+          accountMap.value[id].status = '登录成功'
+          getAccountUserInfo(id)
           loopGetOnlineManList(id)
         } else {
-          accountMap.value[id].status = '登录失败2'
+          accountMap.value[id].status = '登录失败,5s后重试'
+          setTimeout(() => {
+            loginAccount(id)
+          }, 5000);
         }
       })
 
     } else {
-      accountMap.value[id].status = '登录失败'
+      accountMap.value[id].status = '登录失败,5s后重试'
+      setTimeout(() => {
+        loginAccount(id)
+      }, 5000);
+    }
+  })
+}
+function getAccountUserInfo(id) {
+  window.$http({
+    url: "https://www.globalcompanions.com/Login/Home.aspx",
+    method: "GET",
+    jat: true,
+    headers: {
+      Cookie: accountCookieMap.value[id].join(';')
+    }
+  }).then(async res => {
+    if (res.body) {
+      let _t = await window.$html({ page: 'home', html: res.body })
+      _t = JSON.parse(_t)
+      accountMap.value[id].name = _t?.name
+      accountMap.value[id].avatar = _t?.avatar
     }
   })
 }
 
 async function loopGetOnlineManList(id) {
   let _t = 50
-  accountMap.value[id].status = '查询中'
-  getInbox(id)
-  // await getContactsList(id)
-  // getOnlineManList(id, { onlines: _t }).then(res => {
-  //   accountMap.value[id].status = '查询成功'
-  //   accountMap.value[id].interval = setInterval(() => {
-  //     accountMap.value[id].status = '轮询中'
-  //     _t += 1024
-  //     getOnlineManList(id, { onlines: _t }).then(res => {
-  //       accountMap.value[id].status = `新增${res.length}`
-  //     })
-  //   }, 1000 * 35)
-  // })
+  await getInbox(id)
+  await getContactsList(id)
+  sendRecordMap.value[id] = removeRepeat(sendRecordMap.value[id])
+  if (accountMap.value[id].interval) {
+    clearInterval(accountMap.value[id].interval)
+  }
+  getOnlineManList(id, { onlines: _t }).then(res => {
+    accountMap.value[id].interval = setInterval(() => {
+      _t += 1024
+      getOnlineManList(id, { onlines: _t }).then(res => {
+        accountMap.value[id].status = `新增${res.length}`
+      })
+    }, 1000 * 35)
+  })
 }
 
 
-export function getOnlineManList(id, params) {
-  console.log(accountCookieMap.value[id])
+function getOnlineManList(id, params) {
+  accountMap.value[id].status = '查询在线'
   return new Promise((resolve, reject) => {
     window.$http({
       url: 'https://point.globalcompanions.com/updates/onlines/everyone/',
@@ -106,17 +129,13 @@ export function getOnlineManList(id, params) {
         ...params
       },
       headers: {
-        Cookie: accountCookieMap.value[id]
+        Cookie: accountCookieMap.value[id].join(';')
       }
     }).then(res => {
-      console.log(res)
       if (res.body) {
         try {
           let data = JSON.parse(res.body)
-          data[0]?.updates?.map(item => {
-            item.member.status = '等待中'
-            sendRecordMap.value[id].push(item.member)
-          })
+          pushRecord({ id, list: data[0]?.updates?.map(item => item.member), type: 'online' })
           resolve(data[0]?.updates)
         } catch (err) {
           reject()
@@ -128,44 +147,92 @@ export function getOnlineManList(id, params) {
   })
 }
 function getContactsList(id) {
+  accountMap.value[id].status = '查询联系人'
   return window.$http({
     method: "GET",
     url: 'https://point.globalcompanions.com/updates/contacts/everyone/',
     jar: true,
     qs: { onlines: 50 },
     headers: {
-      Cookie: accountCookieMap.value[id]
+      Cookie: accountCookieMap.value[id].join(';')
     },
   }).then(res => {
     if (res.body) {
       let data = JSON.parse(res.body)
-      sendRecordMap.value[id] = data[0]?.updates?.map(item => {
-        item.member.status = '等待中'
-        return item.member
-      }) || []
+      pushRecord({ id, list: data[0]?.updates?.map(item => item.member), type: 'contact' })
     }
   })
 }
 
-function getInbox(id){
-  window.$http({
-    url:'https://www.globalcompanions.com/Login/MailSystem/Inbox.aspx',
-    method:'GET',
-    jar:true,
+function getInbox(id, params = {}) {
+  accountMap.value[id].status = '查询收件箱'
+  return window.$http({
+    url: 'https://www.globalcompanions.com/Login/MailSystem/Inbox.aspx',
+    method: 'GET',
+    jar: true,
     form: {
       __EVENTTARGET: 'ctl00$MAIN$cntrlInbox$cntrlPager',
-      __EVENTARGUMENT:'Prev',
       __VIEWSTATE: __VIEWSTATE,
+      ...params
     },
     json: true,
     headers: {
       "content-type": "application/x-www-form-urlencoded",
-      Cookie: accountCookieMap.value[id]
+      Cookie: accountCookieMap.value[id].join(';')
     },
-  }).then(res=>{
-    console.log(res)
-    if(res.body){
-      window.$html(res.body)
+  }).then(async res => {
+    if (res.body) {
+      let _t = await window.$html({ html: res.body, page: 'inbox' })
+      pushRecord({ id, list: _t.list, type: 'inbox' })
+      if (sendRecordMap.value[id]?.length < _t.total) {
+        return getInbox(id, { __EVENTARGUMENT: 'Next', })
+      }
     }
+  })
+}
+
+//插入
+function pushRecord({ id, list, type }) {
+  if (!sendRecordMap.value[id]) {
+    sendRecordMap.value[id] = []
+  }
+  list.map(item => {
+    item.status = '等待中'
+    item.type = type
+    sendRecordMap.value[id].push(item)
+  })
+  console.log(type)
+  console.log(list)
+}
+
+//去重
+function removeRepeat(arr) {
+  let _t = {}
+  arr = arr.reduce((total, item) => {
+    if (!_t[item.id]) {
+      total.push(item)
+      _t[item.id] = true
+    }
+    return total
+  }, [])
+  return arr
+}
+
+//清空
+export function clear() {
+  Object.keys(accountMap.value).map(item => {
+    if (item.interval) {
+      clearInterval(item.interval)
+    }
+  })
+  accountMap.value = {}
+  sendRecordMap.value = {}
+}
+//重置进度
+export function resetSendRecord() {
+  Object.keys(sendRecordMap.value).map(id => {
+    sendRecordMap.value[id].map(item => {
+      item.status = '等待中'
+    })
   })
 }
