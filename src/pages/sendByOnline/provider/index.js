@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { __VIEWSTATE } from '@/provider/sys'
-import { isStartOfTask,taskQueue } from './send'
+import { isStartOfTask, taskQueue } from './send'
 
 export class Account {
   id = ''
@@ -12,7 +12,11 @@ export class Account {
   configPath = ''
   status = '就绪'
   interval = 0//定时器id
-  newCount = 0
+  sendNum = {
+    total: 0,
+    sended: 0
+  }
+  onlines = 40
   constructor({ id, pw, template, imgs, configPath }) {
     this.id = id
     this.pw = pw
@@ -100,24 +104,22 @@ function getAccountUserInfo(id) {
 }
 
 async function loopGetOnlineManList(id) {
-  let _t = 50
   await getInbox(id)
   await getContactsList(id)
   if (accountMap.value[id].interval) {
     clearInterval(accountMap.value[id].interval)
   }
-  getOnlineManList(id, { onlines: _t }).then(res => {
+  getOnlineManList(id).then(res => {
     accountMap.value[id].interval = setInterval(() => {
-      _t += 1024
-      getOnlineManList(id, { onlines: _t }).then(res => {
-        accountMap.value[id].status = `新增${res.length}`
-      })
+      if (accountMap.value[id].status != '发送中') {
+        getOnlineManList(id)
+      }
     }, 1000 * 35)
   })
 }
 
 
-function getOnlineManList(id, params) {
+function getOnlineManList(id) {
   accountMap.value[id].status = '查询在线'
   return new Promise((resolve, reject) => {
     window.$http({
@@ -125,7 +127,7 @@ function getOnlineManList(id, params) {
       method: 'GET',
       jar: true,
       qs: {
-        ...params
+        onlines: accountMap.value[id].onlines
       },
       headers: {
         Cookie: accountCookieMap.value[id].join(';')
@@ -133,9 +135,9 @@ function getOnlineManList(id, params) {
     }).then(res => {
       if (res.body) {
         try {
+          accountMap.value[id].onlines += 1024
           let data = JSON.parse(res.body)
           pushQueue({ id, list: data[0]?.updates?.map(item => item.member), type: '在线' })
-          resolve(data[0]?.updates)
         } catch (err) {
           reject()
         }
@@ -195,10 +197,11 @@ function pushQueue({ id, list, type }) {
   list.map(item => {
     item.status = '等待中'
     item.type = type
-    item.accountId=id
+    item.name = item.name.replace(/\((\S*)\)/gi, '')
+    item.accountId = id
     taskQueue.value.pending.push(item)
+    accountMap.value[id].sendNum.total += 1
   })
-  taskQueue.value.pending = removeRepeat(taskQueue.value.pending)
 }
 
 //去重

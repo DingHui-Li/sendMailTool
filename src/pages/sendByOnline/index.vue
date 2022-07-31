@@ -16,8 +16,10 @@
       el-table-column(label="名称", property="name")
       el-table-column(label="总数")
         template(#default="{ row }")
-          div {{ sendRecordMap[row?.id]?.length || 0 }}
+          div {{ row.sendNum.total || 0 }}
       el-table-column(label="已发送")
+        template(#default="{ row }")
+          div {{ row.sendNum.sended || 0 }}
       el-table-column(label="状态")
         template(#default="scope")
           el-tag(
@@ -90,7 +92,7 @@ function handleSelectionChange(e) {
 </script>
 <style scoped lang="less">
 .page {
-  height:calc(100vh - 30px);
+  height: calc(100vh - 30px);
   padding: 15px;
   &:deep(.el-tag) {
     border: none;
